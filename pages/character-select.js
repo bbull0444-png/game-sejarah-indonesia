@@ -1,11 +1,8 @@
-import { useState, Suspense } from 'react'
+import { useState, Suspense, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, useGLTF } from '@react-three/drei'
-
-import { useEffect } from 'react'
-import { useGLTF, useAnimations } from '@react-three/drei'
+import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei'
 
 function Character3D({ modelPath }) {
   const { scene, animations } = useGLTF(modelPath)
