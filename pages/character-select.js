@@ -4,19 +4,31 @@ import Head from 'next/head'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
 
-// Component untuk load model 3D GLB
+import { useEffect } from 'react'
+import { useGLTF, useAnimations } from '@react-three/drei'
+
 function Character3D({ modelPath }) {
-  const { scene } = useGLTF(modelPath)
-  
+  const { scene, animations } = useGLTF(modelPath)
+  const { actions } = useAnimations(animations, scene)
+
+  useEffect(() => {
+    if (actions && Object.keys(actions).length > 0) {
+      const firstAnimation = actions[Object.keys(actions)[0]]
+      firstAnimation.reset().fadeIn(0.3).play()
+
+      return () => firstAnimation.fadeOut(0.3)
+    }
+  }, [actions])
+
   return (
-    <primitive 
-      object={scene} 
-      scale={2} 
+    <primitive
+      object={scene}
+      scale={2}
       position={[0, -1, 0]}
-      rotation={[0, 0, 0]}
     />
   )
 }
+
 
 export default function CharacterSelect() {
   const router = useRouter()
