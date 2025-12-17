@@ -6,23 +6,42 @@ import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei'
 
 function Character3D({ modelPath }) {
   const { scene, animations } = useGLTF(modelPath)
-  const { actions } = useAnimations(animations, scene)
+  const { actions, mixer } = useAnimations(animations, scene)
+
+  useEffect(() => {
+    // Clone scene supaya tidak conflict antar instance
+    scene.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true
+      }
+    })
+  }, [scene])
 
   useEffect(() => {
     if (actions && Object.keys(actions).length > 0) {
+      // Stop semua animasi dulu
+      Object.values(actions).forEach(action => action.stop())
+      
+      // Play animasi pertama
       const firstAnimation = actions[Object.keys(actions)[0]]
-      firstAnimation.reset().fadeIn(0.3).play()
-
-      return () => firstAnimation.fadeOut(0.3)
+      if (firstAnimation) {
+        firstAnimation.reset().play()
+      }
     }
-  }, [actions])
+
+    return () => {
+      if (actions) {
+        Object.values(actions).forEach(action => action.stop())
+      }
+    }
+  }, [actions, modelPath]) // Trigger ulang saat modelPath berubah
 
   return (
     <primitive
-      object={scene}
-      scale={8}                    // ← Diperbesar dari 2 jadi 8
-      position={[0, -2, 0]}        // ← Turunkan sedikit supaya kaki keliatan
-      rotation={[0, Math.PI, 0]}   // ← Rotasi 180° supaya menghadap depan
+      object={scene.clone()} // Clone scene untuk menghindari conflict
+      scale={12}              // Perbesar lagi dari 8 jadi 12
+      position={[0, -3, 0]}   // Turunkan lebih bawah
+      rotation={[0, 0, 0]}    // Reset rotation, biarkan natural
     />
   )
 }
@@ -45,7 +64,13 @@ const character = {
     leadership: 75
   }
 }
-
+// Preload semua model supaya tidak lag
+useEffect(() => {
+  useGLTF.preload('/models/characters/character-male/idle.glb')
+  useGLTF.preload('/models/characters/character-male/wave.glb')
+  useGLTF.preload('/models/characters/character-male/selected.glb')
+}, [])
+  
 const handleCharacterHover = () => {
   setAnimationState('wave')
   setCurrentModel('/models/characters/character-male/wave.glb')
@@ -91,16 +116,12 @@ const handleCharacterSelect = () => {
                 onClick={handleCharacterSelect}
               >
                 <Canvas
-                  camera={{ position: [0, 0, 5], fov: 50 }}
-                  style={{ background: 'transparent' }}
-                >
+                camera={{ position: [0, 1, 8], fov: 45 }}  // Zoom in, FOV lebih kecil
+                style={{ background: 'transparent' }}
+              >
                   <ambientLight intensity={0.5} />
                   <directionalLight position={[10, 10, 5]} intensity={1} />
                   <directionalLight position={[-10, -10, -5]} intensity={0.3} />
-                  
-                  <Suspense fallback={null}>
-                    <Character3D modelPath={currentModel} />
-                  </Suspense>
                   
                   <OrbitControls 
                     enableZoom={false}
