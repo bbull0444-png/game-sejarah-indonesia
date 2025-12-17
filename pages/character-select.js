@@ -20,8 +20,9 @@ function Character3D({ modelPath }) {
   return (
     <primitive
       object={scene}
-      scale={2}
-      position={[0, -1, 0]}
+      scale={8}                    // ← Diperbesar dari 2 jadi 8
+      position={[0, -2, 0]}        // ← Turunkan sedikit supaya kaki keliatan
+      rotation={[0, Math.PI, 0]}   // ← Rotasi 180° supaya menghadap depan
     />
   )
 }
