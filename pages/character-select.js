@@ -30,41 +30,31 @@ function Character3D({ modelPath }) {
 
 export default function CharacterSelect() {
   const router = useRouter()
-  const [animationState, setAnimationState] = useState('idle')
-  const [currentModel, setCurrentModel] = useState('/models/characters/character-male/idle.glb')
+ const [animationState, setAnimationState] = useState('idle')
+const [currentModel, setCurrentModel] = useState('/models/characters/character-male/idle.glb')
+const [key, setKey] = useState(0) // ← Tambahkan ini untuk force re-render
 
-  // Data karakter
-  const character = {
-    id: 1,
-    name: "Pahlawan Muda",
-    description: "Seorang pemuda pemberani yang ikut berjuang mempertahankan kemerdekaan Indonesia",
-    stats: {
-      courage: 85,
-      wisdom: 70,
-      leadership: 75
-    }
-  }
+const handleCharacterHover = () => {
+  setAnimationState('wave')
+  setCurrentModel('/models/characters/character-male/wave.glb')
+  setKey(prev => prev + 1) // ← Force refresh model
+}
 
-  const handleCharacterHover = () => {
-    setAnimationState('wave')
-    setCurrentModel('/models/characters/character-male/wave.glb')
-  }
+const handleCharacterLeave = () => {
+  setAnimationState('idle')
+  setCurrentModel('/models/characters/character-male/idle.glb')
+  setKey(prev => prev + 1) // ← Force refresh model
+}
 
-  const handleCharacterLeave = () => {
-    setAnimationState('idle')
-    setCurrentModel('/models/characters/character-male/idle.glb')
-  }
-
-  const handleCharacterSelect = () => {
-    setAnimationState('selected')
-    setCurrentModel('/models/characters/character-male/selected.glb')
-    
-    setTimeout(() => {
-      alert('Karakter dipilih! Game akan dimulai...')
-      // Nanti bisa redirect ke halaman game
-      // router.push('/game')
-    }, 1000)
-  }
+const handleCharacterSelect = () => {
+  setAnimationState('selected')
+  setCurrentModel('/models/characters/character-male/selected.glb')
+  setKey(prev => prev + 1) // ← Force refresh model
+  
+  setTimeout(() => {
+    alert('Karakter dipilih! Game akan dimulai...')
+  }, 1000)
+}
 
   return (
     <>
