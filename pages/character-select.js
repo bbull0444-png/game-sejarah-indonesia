@@ -4,94 +4,65 @@ import Head from 'next/head'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei'
 
+// Component 3D - SIMPLE VERSION
 function Character3D({ modelPath }) {
   const { scene, animations } = useGLTF(modelPath)
-  const { actions, mixer } = useAnimations(animations, scene)
-
-  useEffect(() => {
-    // Clone scene supaya tidak conflict antar instance
-    scene.traverse((child) => {
-      if (child.isMesh) {
-        child.castShadow = true
-      }
-    })
-  }, [scene])
+  const { actions } = useAnimations(animations, scene)
 
   useEffect(() => {
     if (actions && Object.keys(actions).length > 0) {
-      // Stop semua animasi dulu
-      Object.values(actions).forEach(action => action.stop())
+      const firstAction = Object.values(actions)[0]
+      firstAction?.reset().play()
       
-      // Play animasi pertama
-      const firstAnimation = actions[Object.keys(actions)[0]]
-      if (firstAnimation) {
-        firstAnimation.reset().play()
-      }
+      return () => firstAction?.stop()
     }
-
-    return () => {
-      if (actions) {
-        Object.values(actions).forEach(action => action.stop())
-      }
-    }
-  }, [actions, modelPath]) // Trigger ulang saat modelPath berubah
+  }, [actions])
 
   return (
     <primitive
-      object={scene.clone()} // Clone scene untuk menghindari conflict
-      scale={12}              // Perbesar lagi dari 8 jadi 12
-      position={[0, -3, 0]}   // Turunkan lebih bawah
-      rotation={[0, 0, 0]}    // Reset rotation, biarkan natural
+      object={scene}
+      scale={10}
+      position={[0, -2.5, 0]}
+      rotation={[0, 0, 0]}
     />
   )
 }
 
-
 export default function CharacterSelect() {
   const router = useRouter()
- const [animationState, setAnimationState] = useState('idle')
-const [currentModel, setCurrentModel] = useState('/models/characters/character-male/idle.glb')
-const [key, setKey] = useState(0) // ← Tambahkan ini untuk force re-render
+  const [animationState, setAnimationState] = useState('idle')
+  const [currentModel, setCurrentModel] = useState('/models/characters/character-male/idle.glb')
 
   // Data karakter
-const character = {
-  id: 1,
-  name: "Pahlawan Muda",
-  description: "Seorang pemuda pemberani yang ikut berjuang mempertahankan kemerdekaan Indonesia",
-  stats: {
-    courage: 85,
-    wisdom: 70,
-    leadership: 75
+  const character = {
+    id: 1,
+    name: "Pahlawan Muda",
+    description: "Seorang pemuda pemberani yang ikut berjuang mempertahankan kemerdekaan Indonesia",
+    stats: {
+      courage: 85,
+      wisdom: 70,
+      leadership: 75
+    }
   }
-}
-// Preload semua model supaya tidak lag
-useEffect(() => {
-  useGLTF.preload('/models/characters/character-male/idle.glb')
-  useGLTF.preload('/models/characters/character-male/wave.glb')
-  useGLTF.preload('/models/characters/character-male/selected.glb')
-}, [])
-  
-const handleCharacterHover = () => {
-  setAnimationState('wave')
-  setCurrentModel('/models/characters/character-male/wave.glb')
-  setKey(prev => prev + 1) // ← Force refresh model
-}
 
-const handleCharacterLeave = () => {
-  setAnimationState('idle')
-  setCurrentModel('/models/characters/character-male/idle.glb')
-  setKey(prev => prev + 1) // ← Force refresh model
-}
+  const handleCharacterHover = () => {
+    setAnimationState('wave')
+    setCurrentModel('/models/characters/character-male/wave.glb')
+  }
 
-const handleCharacterSelect = () => {
-  setAnimationState('selected')
-  setCurrentModel('/models/characters/character-male/selected.glb')
-  setKey(prev => prev + 1) // ← Force refresh model
-  
-  setTimeout(() => {
-    alert('Karakter dipilih! Game akan dimulai...')
-  }, 1000)
-}
+  const handleCharacterLeave = () => {
+    setAnimationState('idle')
+    setCurrentModel('/models/characters/character-male/idle.glb')
+  }
+
+  const handleCharacterSelect = () => {
+    setAnimationState('selected')
+    setCurrentModel('/models/characters/character-male/selected.glb')
+    
+    setTimeout(() => {
+      alert('Karakter dipilih! Game akan dimulai...')
+    }, 1000)
+  }
 
   return (
     <>
@@ -116,16 +87,21 @@ const handleCharacterSelect = () => {
                 onClick={handleCharacterSelect}
               >
                 <Canvas
-                camera={{ position: [0, 1, 8], fov: 45 }}  // Zoom in, FOV lebih kecil
-                style={{ background: 'transparent' }}
-              >
-                  <ambientLight intensity={0.5} />
-                  <directionalLight position={[10, 10, 5]} intensity={1} />
-                  <directionalLight position={[-10, -10, -5]} intensity={0.3} />
+                  camera={{ position: [0, 1, 6], fov: 45 }}
+                  style={{ background: 'transparent' }}
+                >
+                  <ambientLight intensity={0.7} />
+                  <directionalLight position={[5, 5, 5]} intensity={1} />
+                  <directionalLight position={[-5, -5, -5]} intensity={0.5} />
+                  
+                  <Suspense fallback={null}>
+                    <Character3D modelPath={currentModel} />
+                  </Suspense>
                   
                   <OrbitControls 
                     enableZoom={false}
                     enablePan={false}
+                    autoRotate={false}
                     minPolarAngle={Math.PI / 3}
                     maxPolarAngle={Math.PI / 1.5}
                   />
@@ -175,6 +151,7 @@ const handleCharacterSelect = () => {
         </div>
 
         <style jsx>{`
+          /* SAMA SEPERTI SEBELUMNYA - TIDAK ADA PERUBAHAN CSS */
           .character-select {
             width: 100vw;
             height: 100vh;
