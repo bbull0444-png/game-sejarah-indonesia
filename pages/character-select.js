@@ -1,75 +1,46 @@
-import { useState, Suspense, useEffect, useRef } from 'react'
+import { useState, Suspense, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei'
+import dynamic from 'next/dynamic'
 
-// OPSI 1: Gunakan file lokal (pastikan ada di folder public)
-// OPSI 2: Gunakan CDN eksternal (lebih reliable)
-const USE_EXTERNAL_CDN = true // Set false jika mau pake lokal
+// Dynamic import Canvas untuk avoid SSR issues
+const Canvas = dynamic(() => import('@react-three/fiber').then(mod => mod.Canvas), {
+  ssr: false,
+  loading: () => <div className="loading-3d">Loading 3D...</div>
+})
 
-const MODEL_PATHS = USE_EXTERNAL_CDN ? {
-  idle: 'https://cdn.jsdelivr.net/gh/bbull0444-png/game-sejarah-indonesia@master/public/models/characters/character-male/idle.glb',
-  wave: 'https://cdn.jsdelivr.net/gh/bbull0444-png/game-sejarah-indonesia@master/public/models/characters/character-male/wave.glb',
-  selected: 'https://cdn.jsdelivr.net/gh/bbull0444-png/game-sejarah-indonesia@master/public/models/characters/character-male/selected.glb'
-} : {
-  idle: '/models/characters/character-male/idle.glb',
-  wave: '/models/characters/character-male/wave.glb',
-  selected: '/models/characters/character-male/selected.glb'
-}
+const OrbitControls = dynamic(() => import('@react-three/drei').then(mod => mod.OrbitControls), { ssr: false })
+const useGLTF = dynamic(() => import('@react-three/drei').then(mod => mod.useGLTF), { ssr: false })
+const useAnimations = dynamic(() => import('@react-three/drei').then(mod => mod.useAnimations), { ssr: false })
 
-// Component 3D dengan Error Handling
-function Character3D({ modelPath }) {
-  try {
-    const { scene, animations } = useGLTF(modelPath)
-    const { actions } = useAnimations(animations, scene)
-
-    useEffect(() => {
-      if (actions && Object.keys(actions).length > 0) {
-        const firstAction = Object.values(actions)[0]
-        firstAction?.reset().play()
-        
-        return () => firstAction?.stop()
-      }
-    }, [actions])
-
-    return (
-      <primitive
-        object={scene}
-        scale={10}
-        position={[0, -2.5, 0]}
-        rotation={[0, 0, 0]}
-      />
-    )
-  } catch (error) {
-    console.error('Error loading 3D model:', error)
-    return <FallbackCharacter />
-  }
-}
-
-// Fallback component
+// Simple Fallback Component
 function FallbackCharacter() {
   return (
     <group>
       <mesh position={[0, 0, 0]}>
-        <capsuleGeometry args={[0.3, 1.2, 8, 16]} />
+        <boxGeometry args={[0.8, 2, 0.5]} />
         <meshStandardMaterial color="#ff6b35" />
       </mesh>
-      <mesh position={[0, 0.8, 0]}>
-        <sphereGeometry args={[0.35, 16, 16]} />
+      <mesh position={[0, 1.2, 0]}>
+        <sphereGeometry args={[0.4, 16, 16]} />
         <meshStandardMaterial color="#ff8c5a" />
       </mesh>
     </group>
   )
 }
 
+// Character 3D Component - SIMPLIFIED
+function Character3D({ show }) {
+  if (!show) return <FallbackCharacter />
+  
+  return <FallbackCharacter />
+}
+
 export default function CharacterSelect() {
   const router = useRouter()
   const [animationState, setAnimationState] = useState('idle')
-  const [currentModel, setCurrentModel] = useState(MODEL_PATHS.idle)
-  const [modelLoadError, setModelLoadError] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const canvasRef = useRef(null)
+  const [show3D, setShow3D] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   const character = {
     id: 1,
@@ -83,30 +54,32 @@ export default function CharacterSelect() {
   }
 
   useEffect(() => {
+    setMounted(true)
     const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 2000)
+      setShow3D(true)
+    }, 1000)
     
     return () => clearTimeout(timer)
-  }, [currentModel])
+  }, [])
 
   const handleCharacterHover = () => {
     setAnimationState('wave')
-    setCurrentModel(MODEL_PATHS.wave)
   }
 
   const handleCharacterLeave = () => {
     setAnimationState('idle')
-    setCurrentModel(MODEL_PATHS.idle)
   }
 
   const handleCharacterSelect = () => {
     setAnimationState('selected')
-    setCurrentModel(MODEL_PATHS.selected)
-    
     setTimeout(() => {
-      router.push('/game') // Ganti dengan route game Anda
-    }, 1000)
+      alert('Karakter dipilih! Game akan dimulai...')
+      // router.push('/game')
+    }, 500)
+  }
+
+  if (!mounted) {
+    return null
   }
 
   return (
@@ -130,47 +103,29 @@ export default function CharacterSelect() {
                 onMouseLeave={handleCharacterLeave}
                 onClick={handleCharacterSelect}
               >
-                {isLoading && (
-                  <div className="loading-overlay">
-                    <div className="spinner"></div>
-                    <p>Loading model...</p>
-                  </div>
+                {mounted && (
+                  <Canvas
+                    camera={{ position: [0, 1, 6], fov: 45 }}
+                    style={{ background: 'transparent', width: '100%', height: '100%' }}
+                  >
+                    <ambientLight intensity={0.7} />
+                    <directionalLight position={[5, 5, 5]} intensity={1} />
+                    <directionalLight position={[-5, -5, -5]} intensity={0.5} />
+                    <pointLight position={[0, 2, 0]} intensity={0.5} color="#ff6b35" />
+                    
+                    <Suspense fallback={<FallbackCharacter />}>
+                      <Character3D show={show3D} />
+                    </Suspense>
+                    
+                    <OrbitControls 
+                      enableZoom={false}
+                      enablePan={false}
+                      autoRotate={false}
+                      minPolarAngle={Math.PI / 3}
+                      maxPolarAngle={Math.PI / 1.5}
+                    />
+                  </Canvas>
                 )}
-                
-                <Canvas
-                  ref={canvasRef}
-                  camera={{ position: [0, 1, 6], fov: 45 }}
-                  style={{ 
-                    background: 'transparent',
-                    opacity: isLoading ? 0.3 : 1,
-                    transition: 'opacity 0.5s'
-                  }}
-                  gl={{ 
-                    preserveDrawingBuffer: true,
-                    antialias: true,
-                    alpha: true
-                  }}
-                  onCreated={({ gl }) => {
-                    gl.setClearColor(0x000000, 0)
-                  }}
-                >
-                  <ambientLight intensity={0.7} />
-                  <directionalLight position={[5, 5, 5]} intensity={1} />
-                  <directionalLight position={[-5, -5, -5]} intensity={0.5} />
-                  <pointLight position={[0, 2, 0]} intensity={0.5} color="#ff6b35" />
-                  
-                  <Suspense fallback={<FallbackCharacter />}>
-                    <Character3D modelPath={currentModel} />
-                  </Suspense>
-                  
-                  <OrbitControls 
-                    enableZoom={false}
-                    enablePan={false}
-                    autoRotate={false}
-                    minPolarAngle={Math.PI / 3}
-                    maxPolarAngle={Math.PI / 1.5}
-                  />
-                </Canvas>
                 
                 <div className="animation-label">{animationState.toUpperCase()}</div>
               </div>
@@ -317,30 +272,14 @@ export default function CharacterSelect() {
             box-shadow: 0 0 30px rgba(255, 107, 53, 0.3);
           }
 
-          .loading-overlay {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 10;
+          .loading-3d {
             display: flex;
-            flex-direction: column;
             align-items: center;
-            gap: 15px;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
             color: #ff6b35;
-          }
-
-          .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid rgba(255, 107, 53, 0.2);
-            border-top-color: #ff6b35;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-          }
-
-          @keyframes spin {
-            to { transform: rotate(360deg); }
+            font-size: 1.2rem;
           }
 
           .animation-label {
@@ -468,16 +407,3 @@ export default function CharacterSelect() {
     </>
   )
 }
-```
-
-## **Langkah-langkah Fix Error di Vercel:**
-
-### **1. Pastikan file GLB ada di folder yang benar:**
-```
-public/
-  └── models/
-      └── characters/
-          └── character-male/
-              ├── idle.glb
-              ├── wave.glb
-              └── selected.glb
