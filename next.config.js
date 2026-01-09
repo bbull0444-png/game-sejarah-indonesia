@@ -9,7 +9,6 @@ const nextConfig = {
         filename: 'static/assets/[name][ext]',
       },
     })
-
     return config
   },
 }
