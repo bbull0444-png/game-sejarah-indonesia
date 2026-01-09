@@ -1,47 +1,63 @@
-import { useState, Suspense, useEffect } from 'react'
+import { useState, Suspense, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import dynamic from 'next/dynamic'
+import { Canvas } from '@react-three/fiber'
+import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei'
 
-// Dynamic import Canvas untuk avoid SSR issues
-const Canvas = dynamic(() => import('@react-three/fiber').then(mod => mod.Canvas), {
-  ssr: false,
-  loading: () => <div className="loading-3d">Loading 3D...</div>
-})
+// Component 3D dengan Error Handling
+function Character3D({ modelPath }) {
+  const [loadError, setLoadError] = useState(false)
+  
+  try {
+    const { scene, animations } = useGLTF(modelPath)
+    const { actions } = useAnimations(animations, scene)
 
-const OrbitControls = dynamic(() => import('@react-three/drei').then(mod => mod.OrbitControls), { ssr: false })
-const useGLTF = dynamic(() => import('@react-three/drei').then(mod => mod.useGLTF), { ssr: false })
-const useAnimations = dynamic(() => import('@react-three/drei').then(mod => mod.useAnimations), { ssr: false })
+    useEffect(() => {
+      if (actions && Object.keys(actions).length > 0) {
+        const firstAction = Object.values(actions)[0]
+        firstAction?.reset().play()
+        
+        return () => firstAction?.stop()
+      }
+    }, [actions])
 
-// Simple Fallback Component
-function FallbackCharacter() {
-  return (
-    <group>
-      <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[0.8, 2, 0.5]} />
-        <meshStandardMaterial color="#ff6b35" />
-      </mesh>
-      <mesh position={[0, 1.2, 0]}>
-        <sphereGeometry args={[0.4, 16, 16]} />
-        <meshStandardMaterial color="#ff8c5a" />
-      </mesh>
-    </group>
-  )
+    if (loadError) {
+      return null
+    }
+
+    return (
+      <primitive
+        object={scene}
+        scale={10}
+        position={[0, -2.5, 0]}
+        rotation={[0, 0, 0]}
+      />
+    )
+  } catch (error) {
+    console.error('Error loading 3D model:', error)
+    return null
+  }
 }
 
-// Character 3D Component - SIMPLIFIED
-function Character3D({ show }) {
-  if (!show) return <FallbackCharacter />
-  
-  return <FallbackCharacter />
+// Fallback component ketika model tidak bisa dimuat
+function FallbackCharacter() {
+  return (
+    <mesh position={[0, 0, 0]}>
+      <boxGeometry args={[1, 2, 0.5]} />
+      <meshStandardMaterial color="#ff6b35" />
+    </mesh>
+  )
 }
 
 export default function CharacterSelect() {
   const router = useRouter()
   const [animationState, setAnimationState] = useState('idle')
-  const [show3D, setShow3D] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const [currentModel, setCurrentModel] = useState('/models/characters/character-male/idle.glb')
+  const [modelLoadError, setModelLoadError] = useState(false)
+  const [showCanvas, setShowCanvas] = useState(true)
+  const canvasRef = useRef(null)
 
+  // Data karakter
   const character = {
     id: 1,
     name: "Pahlawan Muda",
@@ -53,33 +69,52 @@ export default function CharacterSelect() {
     }
   }
 
+  // Cek apakah model exists sebelum load
   useEffect(() => {
-    setMounted(true)
-    const timer = setTimeout(() => {
-      setShow3D(true)
-    }, 1000)
+    const checkModel = async () => {
+      try {
+        const response = await fetch(currentModel, { method: 'HEAD' })
+        if (!response.ok) {
+          console.warn('Model not found:', currentModel)
+          setModelLoadError(true)
+        } else {
+          setModelLoadError(false)
+        }
+      } catch (error) {
+        console.error('Error checking model:', error)
+        setModelLoadError(true)
+      }
+    }
     
-    return () => clearTimeout(timer)
-  }, [])
+    checkModel()
+  }, [currentModel])
 
   const handleCharacterHover = () => {
     setAnimationState('wave')
+    const newModel = '/models/characters/character-male/wave.glb'
+    setCurrentModel(newModel)
   }
 
   const handleCharacterLeave = () => {
     setAnimationState('idle')
+    const newModel = '/models/characters/character-male/idle.glb'
+    setCurrentModel(newModel)
   }
 
   const handleCharacterSelect = () => {
     setAnimationState('selected')
+    const newModel = '/models/characters/character-male/selected.glb'
+    setCurrentModel(newModel)
+    
     setTimeout(() => {
       alert('Karakter dipilih! Game akan dimulai...')
-      // router.push('/game')
-    }, 500)
+    }, 1000)
   }
 
-  if (!mounted) {
-    return null
+  // Error boundary untuk Canvas
+  const handleCanvasError = (error) => {
+    console.error('Canvas error:', error)
+    setShowCanvas(false)
   }
 
   return (
@@ -97,24 +132,31 @@ export default function CharacterSelect() {
 
           <div className="character-container">
             <div className="character-display">
+              {/* 3D Model Canvas */}
               <div 
                 className="character-model"
                 onMouseEnter={handleCharacterHover}
                 onMouseLeave={handleCharacterLeave}
                 onClick={handleCharacterSelect}
               >
-                {mounted && (
+                {showCanvas && !modelLoadError ? (
                   <Canvas
+                    ref={canvasRef}
                     camera={{ position: [0, 1, 6], fov: 45 }}
-                    style={{ background: 'transparent', width: '100%', height: '100%' }}
+                    style={{ background: 'transparent' }}
+                    onError={handleCanvasError}
+                    gl={{ 
+                      preserveDrawingBuffer: true,
+                      failIfMajorPerformanceCaveat: false,
+                      powerPreference: 'high-performance'
+                    }}
                   >
                     <ambientLight intensity={0.7} />
                     <directionalLight position={[5, 5, 5]} intensity={1} />
                     <directionalLight position={[-5, -5, -5]} intensity={0.5} />
-                    <pointLight position={[0, 2, 0]} intensity={0.5} color="#ff6b35" />
                     
                     <Suspense fallback={<FallbackCharacter />}>
-                      <Character3D show={show3D} />
+                      <Character3D modelPath={currentModel} />
                     </Suspense>
                     
                     <OrbitControls 
@@ -125,6 +167,12 @@ export default function CharacterSelect() {
                       maxPolarAngle={Math.PI / 1.5}
                     />
                   </Canvas>
+                ) : (
+                  <div className="model-placeholder">
+                    <div className="placeholder-icon">👤</div>
+                    <p className="placeholder-text">Model karakter tidak tersedia</p>
+                    <p className="placeholder-subtext">Cek file model di folder public/models/characters/</p>
+                  </div>
                 )}
                 
                 <div className="animation-label">{animationState.toUpperCase()}</div>
@@ -272,14 +320,32 @@ export default function CharacterSelect() {
             box-shadow: 0 0 30px rgba(255, 107, 53, 0.3);
           }
 
-          .loading-3d {
+          .model-placeholder {
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            width: 100%;
-            height: 100%;
+            color: #888;
+            text-align: center;
+            padding: 20px;
+          }
+
+          .placeholder-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+          }
+
+          .placeholder-text {
+            font-size: 1.1rem;
             color: #ff6b35;
-            font-size: 1.2rem;
+            margin-bottom: 10px;
+          }
+
+          .placeholder-subtext {
+            font-size: 0.85rem;
+            color: #666;
+            max-width: 250px;
           }
 
           .animation-label {
@@ -290,7 +356,6 @@ export default function CharacterSelect() {
             font-weight: 700;
             letter-spacing: 0.2em;
             text-shadow: 0 0 10px rgba(255, 107, 53, 0.8);
-            z-index: 5;
           }
 
           .character-info {
@@ -407,3 +472,8 @@ export default function CharacterSelect() {
     </>
   )
 }
+
+// Preload models untuk performa lebih baik
+useGLTF.preload('/models/characters/character-male/idle.glb')
+useGLTF.preload('/models/characters/character-male/wave.glb')
+useGLTF.preload('/models/characters/character-male/selected.glb')
