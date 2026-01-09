@@ -56,6 +56,15 @@ export default function CharacterSelect() {
   const [showCanvas, setShowCanvas] = useState(true)
   const canvasRef = useRef(null)
 
+    // ✅ Preload models di dalam useEffect
+  useEffect(() => {
+    // Preload semua model
+    useGLTF.preload('/models/characters/character-male/idle.glb')
+    useGLTF.preload('/models/characters/character-male/wave.glb')
+    useGLTF.preload('/models/characters/character-male/selected.glb')
+    useGLTF.preload('/models/characters/character-male/walk.glb')
+  }, [])
+
   // Data karakter
   const character = {
     id: 1,
@@ -471,8 +480,3 @@ export default function CharacterSelect() {
     </>
   )
 }
-
-// Preload models untuk performa lebih baik
-useGLTF.preload('/models/characters/character-male/idle.glb')
-useGLTF.preload('/models/characters/character-male/wave.glb')
-useGLTF.preload('/models/characters/character-male/selected.glb')
