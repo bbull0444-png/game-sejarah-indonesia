@@ -4,7 +4,6 @@ import Head from 'next/head'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei'
 
-// Component 3D dengan Error Handling
 function Character3D({ modelPath }) {
   const [loadError, setLoadError] = useState(false)
   
