@@ -4,15 +4,24 @@ import Head from 'next/head'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei'
 
-// BASE URL untuk raw files di GitHub
-const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/bbull0444-png/game-sejarah-indonesia/master/public'
+// OPSI 1: Gunakan file lokal (pastikan ada di folder public)
+// OPSI 2: Gunakan CDN eksternal (lebih reliable)
+const USE_EXTERNAL_CDN = true // Set false jika mau pake lokal
+
+const MODEL_PATHS = USE_EXTERNAL_CDN ? {
+  idle: 'https://cdn.jsdelivr.net/gh/bbull0444-png/game-sejarah-indonesia@master/public/models/characters/character-male/idle.glb',
+  wave: 'https://cdn.jsdelivr.net/gh/bbull0444-png/game-sejarah-indonesia@master/public/models/characters/character-male/wave.glb',
+  selected: 'https://cdn.jsdelivr.net/gh/bbull0444-png/game-sejarah-indonesia@master/public/models/characters/character-male/selected.glb'
+} : {
+  idle: '/models/characters/character-male/idle.glb',
+  wave: '/models/characters/character-male/wave.glb',
+  selected: '/models/characters/character-male/selected.glb'
+}
 
 // Component 3D dengan Error Handling
 function Character3D({ modelPath }) {
-  const [loadError, setLoadError] = useState(false)
-  
   try {
-    const { scene, animations } = useGLTF(modelPath, true)
+    const { scene, animations } = useGLTF(modelPath)
     const { actions } = useAnimations(animations, scene)
 
     useEffect(() => {
@@ -23,10 +32,6 @@ function Character3D({ modelPath }) {
         return () => firstAction?.stop()
       }
     }, [actions])
-
-    if (loadError) {
-      return null
-    }
 
     return (
       <primitive
@@ -42,26 +47,30 @@ function Character3D({ modelPath }) {
   }
 }
 
-// Fallback component ketika model tidak bisa dimuat
+// Fallback component
 function FallbackCharacter() {
   return (
-    <mesh position={[0, 0, 0]}>
-      <boxGeometry args={[1, 2, 0.5]} />
-      <meshStandardMaterial color="#ff6b35" />
-    </mesh>
+    <group>
+      <mesh position={[0, 0, 0]}>
+        <capsuleGeometry args={[0.3, 1.2, 8, 16]} />
+        <meshStandardMaterial color="#ff6b35" />
+      </mesh>
+      <mesh position={[0, 0.8, 0]}>
+        <sphereGeometry args={[0.35, 16, 16]} />
+        <meshStandardMaterial color="#ff8c5a" />
+      </mesh>
+    </group>
   )
 }
 
 export default function CharacterSelect() {
   const router = useRouter()
   const [animationState, setAnimationState] = useState('idle')
-  const [currentModel, setCurrentModel] = useState(`${GITHUB_RAW_BASE}/models/characters/character-male/idle.glb`)
+  const [currentModel, setCurrentModel] = useState(MODEL_PATHS.idle)
   const [modelLoadError, setModelLoadError] = useState(false)
-  const [showCanvas, setShowCanvas] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const canvasRef = useRef(null)
 
-  // Data karakter
   const character = {
     id: 1,
     name: "Pahlawan Muda",
@@ -73,53 +82,31 @@ export default function CharacterSelect() {
     }
   }
 
-  // Cek apakah model exists
   useEffect(() => {
-    const checkModel = async () => {
-      setIsLoading(true)
-      try {
-        const response = await fetch(currentModel, { method: 'HEAD' })
-        if (!response.ok) {
-          console.warn('Model not found:', currentModel)
-          setModelLoadError(true)
-        } else {
-          console.log('Model found:', currentModel)
-          setModelLoadError(false)
-        }
-      } catch (error) {
-        console.error('Error checking model:', error)
-        setModelLoadError(true)
-      } finally {
-        setIsLoading(false)
-      }
-    }
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 2000)
     
-    checkModel()
+    return () => clearTimeout(timer)
   }, [currentModel])
 
   const handleCharacterHover = () => {
     setAnimationState('wave')
-    setCurrentModel(`${GITHUB_RAW_BASE}/models/characters/character-male/wave.glb`)
+    setCurrentModel(MODEL_PATHS.wave)
   }
 
   const handleCharacterLeave = () => {
     setAnimationState('idle')
-    setCurrentModel(`${GITHUB_RAW_BASE}/models/characters/character-male/idle.glb`)
+    setCurrentModel(MODEL_PATHS.idle)
   }
 
   const handleCharacterSelect = () => {
     setAnimationState('selected')
-    setCurrentModel(`${GITHUB_RAW_BASE}/models/characters/character-male/selected.glb`)
+    setCurrentModel(MODEL_PATHS.selected)
     
     setTimeout(() => {
-      alert('Karakter dipilih! Game akan dimulai...')
+      router.push('/game') // Ganti dengan route game Anda
     }, 1000)
-  }
-
-  // Error boundary untuk Canvas
-  const handleCanvasError = (error) => {
-    console.error('Canvas error:', error)
-    setShowCanvas(false)
   }
 
   return (
@@ -137,58 +124,53 @@ export default function CharacterSelect() {
 
           <div className="character-container">
             <div className="character-display">
-              {/* 3D Model Canvas */}
               <div 
                 className="character-model"
                 onMouseEnter={handleCharacterHover}
                 onMouseLeave={handleCharacterLeave}
                 onClick={handleCharacterSelect}
               >
-                {isLoading ? (
-                  <div className="model-placeholder">
+                {isLoading && (
+                  <div className="loading-overlay">
                     <div className="spinner"></div>
-                    <p className="placeholder-text">Loading model...</p>
-                  </div>
-                ) : showCanvas && !modelLoadError ? (
-                  <Canvas
-                    ref={canvasRef}
-                    camera={{ position: [0, 1, 6], fov: 45 }}
-                    style={{ background: 'transparent' }}
-                    onError={handleCanvasError}
-                    gl={{ 
-                      preserveDrawingBuffer: true,
-                      failIfMajorPerformanceCaveat: false,
-                      powerPreference: 'high-performance'
-                    }}
-                  >
-                    <ambientLight intensity={0.7} />
-                    <directionalLight position={[5, 5, 5]} intensity={1} />
-                    <directionalLight position={[-5, -5, -5]} intensity={0.5} />
-                    
-                    <Suspense fallback={<FallbackCharacter />}>
-                      <Character3D modelPath={currentModel} />
-                    </Suspense>
-                    
-                    <OrbitControls 
-                      enableZoom={false}
-                      enablePan={false}
-                      autoRotate={false}
-                      minPolarAngle={Math.PI / 3}
-                      maxPolarAngle={Math.PI / 1.5}
-                    />
-                  </Canvas>
-                ) : (
-                  <div className="model-placeholder">
-                    <div className="placeholder-icon">👤</div>
-                    <p className="placeholder-text">Model karakter tidak dapat dimuat</p>
-                    <p className="placeholder-subtext">
-                      File ada di GitHub tapi tidak bisa diakses langsung
-                    </p>
-                    <p className="placeholder-hint">
-                      Gunakan GitHub Raw URL atau hosting terpisah
-                    </p>
+                    <p>Loading model...</p>
                   </div>
                 )}
+                
+                <Canvas
+                  ref={canvasRef}
+                  camera={{ position: [0, 1, 6], fov: 45 }}
+                  style={{ 
+                    background: 'transparent',
+                    opacity: isLoading ? 0.3 : 1,
+                    transition: 'opacity 0.5s'
+                  }}
+                  gl={{ 
+                    preserveDrawingBuffer: true,
+                    antialias: true,
+                    alpha: true
+                  }}
+                  onCreated={({ gl }) => {
+                    gl.setClearColor(0x000000, 0)
+                  }}
+                >
+                  <ambientLight intensity={0.7} />
+                  <directionalLight position={[5, 5, 5]} intensity={1} />
+                  <directionalLight position={[-5, -5, -5]} intensity={0.5} />
+                  <pointLight position={[0, 2, 0]} intensity={0.5} color="#ff6b35" />
+                  
+                  <Suspense fallback={<FallbackCharacter />}>
+                    <Character3D modelPath={currentModel} />
+                  </Suspense>
+                  
+                  <OrbitControls 
+                    enableZoom={false}
+                    enablePan={false}
+                    autoRotate={false}
+                    minPolarAngle={Math.PI / 3}
+                    maxPolarAngle={Math.PI / 1.5}
+                  />
+                </Canvas>
                 
                 <div className="animation-label">{animationState.toUpperCase()}</div>
               </div>
@@ -335,6 +317,19 @@ export default function CharacterSelect() {
             box-shadow: 0 0 30px rgba(255, 107, 53, 0.3);
           }
 
+          .loading-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            color: #ff6b35;
+          }
+
           .spinner {
             width: 50px;
             height: 50px;
@@ -342,46 +337,10 @@ export default function CharacterSelect() {
             border-top-color: #ff6b35;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-bottom: 15px;
           }
 
           @keyframes spin {
             to { transform: rotate(360deg); }
-          }
-
-          .model-placeholder {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: #888;
-            text-align: center;
-            padding: 20px;
-          }
-
-          .placeholder-icon {
-            font-size: 80px;
-            margin-bottom: 20px;
-            opacity: 0.5;
-          }
-
-          .placeholder-text {
-            font-size: 1.1rem;
-            color: #ff6b35;
-            margin-bottom: 10px;
-          }
-
-          .placeholder-subtext {
-            font-size: 0.85rem;
-            color: #666;
-            max-width: 250px;
-            margin-bottom: 8px;
-          }
-
-          .placeholder-hint {
-            font-size: 0.75rem;
-            color: #555;
-            font-style: italic;
           }
 
           .animation-label {
@@ -392,6 +351,7 @@ export default function CharacterSelect() {
             font-weight: 700;
             letter-spacing: 0.2em;
             text-shadow: 0 0 10px rgba(255, 107, 53, 0.8);
+            z-index: 5;
           }
 
           .character-info {
@@ -508,9 +468,16 @@ export default function CharacterSelect() {
     </>
   )
 }
+```
 
-// Preload models dengan GitHub Raw URL
-const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/bbull0444-png/game-sejarah-indonesia/master/public'
-useGLTF.preload(`${GITHUB_RAW_BASE}/models/characters/character-male/idle.glb`)
-useGLTF.preload(`${GITHUB_RAW_BASE}/models/characters/character-male/wave.glb`)
-useGLTF.preload(`${GITHUB_RAW_BASE}/models/characters/character-male/selected.glb`)
+## **Langkah-langkah Fix Error di Vercel:**
+
+### **1. Pastikan file GLB ada di folder yang benar:**
+```
+public/
+  └── models/
+      └── characters/
+          └── character-male/
+              ├── idle.glb
+              ├── wave.glb
+              └── selected.glb
