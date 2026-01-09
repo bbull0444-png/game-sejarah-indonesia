@@ -1,30 +1,51 @@
-import { useState, Suspense, useEffect } from 'react'
+import { useState, Suspense, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei'
 
-// Component 3D - SIMPLE VERSION
+// Component 3D dengan Error Handling
 function Character3D({ modelPath }) {
-  const { scene, animations } = useGLTF(modelPath)
-  const { actions } = useAnimations(animations, scene)
+  const [loadError, setLoadError] = useState(false)
+  
+  try {
+    const { scene, animations } = useGLTF(modelPath)
+    const { actions } = useAnimations(animations, scene)
 
-  useEffect(() => {
-    if (actions && Object.keys(actions).length > 0) {
-      const firstAction = Object.values(actions)[0]
-      firstAction?.reset().play()
-      
-      return () => firstAction?.stop()
+    useEffect(() => {
+      if (actions && Object.keys(actions).length > 0) {
+        const firstAction = Object.values(actions)[0]
+        firstAction?.reset().play()
+        
+        return () => firstAction?.stop()
+      }
+    }, [actions])
+
+    if (loadError) {
+      return null
     }
-  }, [actions])
 
+    return (
+      <primitive
+        object={scene}
+        scale={10}
+        position={[0, -2.5, 0]}
+        rotation={[0, 0, 0]}
+      />
+    )
+  } catch (error) {
+    console.error('Error loading 3D model:', error)
+    return null
+  }
+}
+
+// Fallback component ketika model tidak bisa dimuat
+function FallbackCharacter() {
   return (
-    <primitive
-      object={scene}
-      scale={10}
-      position={[0, -2.5, 0]}
-      rotation={[0, 0, 0]}
-    />
+    <mesh position={[0, 0, 0]}>
+      <boxGeometry args={[1, 2, 0.5]} />
+      <meshStandardMaterial color="#ff6b35" />
+    </mesh>
   )
 }
 
@@ -32,6 +53,9 @@ export default function CharacterSelect() {
   const router = useRouter()
   const [animationState, setAnimationState] = useState('idle')
   const [currentModel, setCurrentModel] = useState('/models/characters/character-male/idle.glb')
+  const [modelLoadError, setModelLoadError] = useState(false)
+  const [showCanvas, setShowCanvas] = useState(true)
+  const canvasRef = useRef(null)
 
   // Data karakter
   const character = {
@@ -45,23 +69,52 @@ export default function CharacterSelect() {
     }
   }
 
+  // Cek apakah model exists sebelum load
+  useEffect(() => {
+    const checkModel = async () => {
+      try {
+        const response = await fetch(currentModel, { method: 'HEAD' })
+        if (!response.ok) {
+          console.warn('Model not found:', currentModel)
+          setModelLoadError(true)
+        } else {
+          setModelLoadError(false)
+        }
+      } catch (error) {
+        console.error('Error checking model:', error)
+        setModelLoadError(true)
+      }
+    }
+    
+    checkModel()
+  }, [currentModel])
+
   const handleCharacterHover = () => {
     setAnimationState('wave')
-    setCurrentModel('/models/characters/character-male/wave.glb')
+    const newModel = '/models/characters/character-male/wave.glb'
+    setCurrentModel(newModel)
   }
 
   const handleCharacterLeave = () => {
     setAnimationState('idle')
-    setCurrentModel('/models/characters/character-male/idle.glb')
+    const newModel = '/models/characters/character-male/idle.glb'
+    setCurrentModel(newModel)
   }
 
   const handleCharacterSelect = () => {
     setAnimationState('selected')
-    setCurrentModel('/models/characters/character-male/selected.glb')
+    const newModel = '/models/characters/character-male/selected.glb'
+    setCurrentModel(newModel)
     
     setTimeout(() => {
       alert('Karakter dipilih! Game akan dimulai...')
     }, 1000)
+  }
+
+  // Error boundary untuk Canvas
+  const handleCanvasError = (error) => {
+    console.error('Canvas error:', error)
+    setShowCanvas(false)
   }
 
   return (
@@ -86,26 +139,41 @@ export default function CharacterSelect() {
                 onMouseLeave={handleCharacterLeave}
                 onClick={handleCharacterSelect}
               >
-                <Canvas
-                  camera={{ position: [0, 1, 6], fov: 45 }}
-                  style={{ background: 'transparent' }}
-                >
-                  <ambientLight intensity={0.7} />
-                  <directionalLight position={[5, 5, 5]} intensity={1} />
-                  <directionalLight position={[-5, -5, -5]} intensity={0.5} />
-                  
-                  <Suspense fallback={null}>
-                    <Character3D modelPath={currentModel} />
-                  </Suspense>
-                  
-                  <OrbitControls 
-                    enableZoom={false}
-                    enablePan={false}
-                    autoRotate={false}
-                    minPolarAngle={Math.PI / 3}
-                    maxPolarAngle={Math.PI / 1.5}
-                  />
-                </Canvas>
+                {showCanvas && !modelLoadError ? (
+                  <Canvas
+                    ref={canvasRef}
+                    camera={{ position: [0, 1, 6], fov: 45 }}
+                    style={{ background: 'transparent' }}
+                    onError={handleCanvasError}
+                    gl={{ 
+                      preserveDrawingBuffer: true,
+                      failIfMajorPerformanceCaveat: false,
+                      powerPreference: 'high-performance'
+                    }}
+                  >
+                    <ambientLight intensity={0.7} />
+                    <directionalLight position={[5, 5, 5]} intensity={1} />
+                    <directionalLight position={[-5, -5, -5]} intensity={0.5} />
+                    
+                    <Suspense fallback={<FallbackCharacter />}>
+                      <Character3D modelPath={currentModel} />
+                    </Suspense>
+                    
+                    <OrbitControls 
+                      enableZoom={false}
+                      enablePan={false}
+                      autoRotate={false}
+                      minPolarAngle={Math.PI / 3}
+                      maxPolarAngle={Math.PI / 1.5}
+                    />
+                  </Canvas>
+                ) : (
+                  <div className="model-placeholder">
+                    <div className="placeholder-icon">👤</div>
+                    <p className="placeholder-text">Model karakter tidak tersedia</p>
+                    <p className="placeholder-subtext">Cek file model di folder public/models/characters/</p>
+                  </div>
+                )}
                 
                 <div className="animation-label">{animationState.toUpperCase()}</div>
               </div>
@@ -151,7 +219,6 @@ export default function CharacterSelect() {
         </div>
 
         <style jsx>{`
-          /* SAMA SEPERTI SEBELUMNYA - TIDAK ADA PERUBAHAN CSS */
           .character-select {
             width: 100vw;
             height: 100vh;
@@ -251,6 +318,34 @@ export default function CharacterSelect() {
           .character-model:hover {
             border-color: rgba(255, 107, 53, 0.8);
             box-shadow: 0 0 30px rgba(255, 107, 53, 0.3);
+          }
+
+          .model-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+            text-align: center;
+            padding: 20px;
+          }
+
+          .placeholder-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+          }
+
+          .placeholder-text {
+            font-size: 1.1rem;
+            color: #ff6b35;
+            margin-bottom: 10px;
+          }
+
+          .placeholder-subtext {
+            font-size: 0.85rem;
+            color: #666;
+            max-width: 250px;
           }
 
           .animation-label {
@@ -377,3 +472,8 @@ export default function CharacterSelect() {
     </>
   )
 }
+
+// Preload models untuk performa lebih baik
+useGLTF.preload('/models/characters/character-male/idle.glb')
+useGLTF.preload('/models/characters/character-male/wave.glb')
+useGLTF.preload('/models/characters/character-male/selected.glb')
