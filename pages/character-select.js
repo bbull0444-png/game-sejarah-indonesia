@@ -4,12 +4,15 @@ import Head from 'next/head'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei'
 
+// BASE URL untuk raw files di GitHub
+const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/bbull0444-png/game-sejarah-indonesia/master/public'
+
 // Component 3D dengan Error Handling
 function Character3D({ modelPath }) {
   const [loadError, setLoadError] = useState(false)
   
   try {
-    const { scene, animations } = useGLTF(modelPath)
+    const { scene, animations } = useGLTF(modelPath, true)
     const { actions } = useAnimations(animations, scene)
 
     useEffect(() => {
@@ -35,7 +38,7 @@ function Character3D({ modelPath }) {
     )
   } catch (error) {
     console.error('Error loading 3D model:', error)
-    return null
+    return <FallbackCharacter />
   }
 }
 
@@ -52,9 +55,10 @@ function FallbackCharacter() {
 export default function CharacterSelect() {
   const router = useRouter()
   const [animationState, setAnimationState] = useState('idle')
-  const [currentModel, setCurrentModel] = useState('/models/characters/character-male/idle.glb')
+  const [currentModel, setCurrentModel] = useState(`${GITHUB_RAW_BASE}/models/characters/character-male/idle.glb`)
   const [modelLoadError, setModelLoadError] = useState(false)
   const [showCanvas, setShowCanvas] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
   const canvasRef = useRef(null)
 
   // Data karakter
@@ -69,20 +73,24 @@ export default function CharacterSelect() {
     }
   }
 
-  // Cek apakah model exists sebelum load
+  // Cek apakah model exists
   useEffect(() => {
     const checkModel = async () => {
+      setIsLoading(true)
       try {
         const response = await fetch(currentModel, { method: 'HEAD' })
         if (!response.ok) {
           console.warn('Model not found:', currentModel)
           setModelLoadError(true)
         } else {
+          console.log('Model found:', currentModel)
           setModelLoadError(false)
         }
       } catch (error) {
         console.error('Error checking model:', error)
         setModelLoadError(true)
+      } finally {
+        setIsLoading(false)
       }
     }
     
@@ -91,20 +99,17 @@ export default function CharacterSelect() {
 
   const handleCharacterHover = () => {
     setAnimationState('wave')
-    const newModel = '/models/characters/character-male/wave.glb'
-    setCurrentModel(newModel)
+    setCurrentModel(`${GITHUB_RAW_BASE}/models/characters/character-male/wave.glb`)
   }
 
   const handleCharacterLeave = () => {
     setAnimationState('idle')
-    const newModel = '/models/characters/character-male/idle.glb'
-    setCurrentModel(newModel)
+    setCurrentModel(`${GITHUB_RAW_BASE}/models/characters/character-male/idle.glb`)
   }
 
   const handleCharacterSelect = () => {
     setAnimationState('selected')
-    const newModel = '/models/characters/character-male/selected.glb'
-    setCurrentModel(newModel)
+    setCurrentModel(`${GITHUB_RAW_BASE}/models/characters/character-male/selected.glb`)
     
     setTimeout(() => {
       alert('Karakter dipilih! Game akan dimulai...')
@@ -139,7 +144,12 @@ export default function CharacterSelect() {
                 onMouseLeave={handleCharacterLeave}
                 onClick={handleCharacterSelect}
               >
-                {showCanvas && !modelLoadError ? (
+                {isLoading ? (
+                  <div className="model-placeholder">
+                    <div className="spinner"></div>
+                    <p className="placeholder-text">Loading model...</p>
+                  </div>
+                ) : showCanvas && !modelLoadError ? (
                   <Canvas
                     ref={canvasRef}
                     camera={{ position: [0, 1, 6], fov: 45 }}
@@ -170,8 +180,13 @@ export default function CharacterSelect() {
                 ) : (
                   <div className="model-placeholder">
                     <div className="placeholder-icon">👤</div>
-                    <p className="placeholder-text">Model karakter tidak tersedia</p>
-                    <p className="placeholder-subtext">Cek file model di folder public/models/characters/</p>
+                    <p className="placeholder-text">Model karakter tidak dapat dimuat</p>
+                    <p className="placeholder-subtext">
+                      File ada di GitHub tapi tidak bisa diakses langsung
+                    </p>
+                    <p className="placeholder-hint">
+                      Gunakan GitHub Raw URL atau hosting terpisah
+                    </p>
                   </div>
                 )}
                 
@@ -320,6 +335,20 @@ export default function CharacterSelect() {
             box-shadow: 0 0 30px rgba(255, 107, 53, 0.3);
           }
 
+          .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 107, 53, 0.2);
+            border-top-color: #ff6b35;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+          }
+
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+
           .model-placeholder {
             display: flex;
             flex-direction: column;
@@ -346,6 +375,13 @@ export default function CharacterSelect() {
             font-size: 0.85rem;
             color: #666;
             max-width: 250px;
+            margin-bottom: 8px;
+          }
+
+          .placeholder-hint {
+            font-size: 0.75rem;
+            color: #555;
+            font-style: italic;
           }
 
           .animation-label {
@@ -473,7 +509,8 @@ export default function CharacterSelect() {
   )
 }
 
-// Preload models untuk performa lebih baik
-useGLTF.preload('/models/characters/character-male/idle.glb')
-useGLTF.preload('/models/characters/character-male/wave.glb')
-useGLTF.preload('/models/characters/character-male/selected.glb')
+// Preload models dengan GitHub Raw URL
+const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/bbull0444-png/game-sejarah-indonesia/master/public'
+useGLTF.preload(`${GITHUB_RAW_BASE}/models/characters/character-male/idle.glb`)
+useGLTF.preload(`${GITHUB_RAW_BASE}/models/characters/character-male/wave.glb`)
+useGLTF.preload(`${GITHUB_RAW_BASE}/models/characters/character-male/selected.glb`)
