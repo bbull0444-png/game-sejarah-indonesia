@@ -1,0 +1,13 @@
+[build]
+  publish = "out"
+  command = "npm run build && npm run export"
+
+[[headers]]
+  for = "/models/*.glb"
+  [headers.values]
+    Content-Type = "model/gltf-binary"
+
+[[headers]]
+  for = "/models/*.gltf"
+  [headers.values]
+    Content-Type = "model/gltf+json"
