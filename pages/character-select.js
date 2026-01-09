@@ -1,9 +1,25 @@
-import { useState, useEffect } from 'react'
+// pages/character-select.js - VERSI SEDERHANA
+import { useState } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
+import Simple3DViewer from '../components/Simple3DViewer' // ← IMPORT BARU
 
 export default function CharacterSelect() {
   const router = useRouter()
+  const [testResult, setTestResult] = useState('')
+
+  const testModelFile = async () => {
+    try {
+      const response = await fetch('/models/characters/character-male/idle.glb')
+      if (response.ok) {
+        setTestResult('✅ Model ditemukan! Status: ' + response.status)
+      } else {
+        setTestResult('❌ Model TIDAK ditemukan! Status: ' + response.status)
+      }
+    } catch (error) {
+      setTestResult('❌ Error: ' + error.message)
+    }
+  }
   
   return (
     <>
